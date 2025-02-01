@@ -256,7 +256,6 @@ class EmailGenerator:
         self.ascii_surname = self.turkish_surname.lower().translate(tr_to_en)
 
     def generate_email(self):
-        """Generate email address in format: turkish_name.turkish_surname.random_3_digits@domain"""
         random_digits = "".join(random.choices("0123456789", k=3))
         return f"{self.ascii_name}.{self.ascii_surname}.{random_digits}@{self.domain}"
 
