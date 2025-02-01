@@ -205,6 +205,32 @@ def sign_up_account(browser, tab):
     return True
 
 
+def generate_turkish_first_name():
+    """Generate random Turkish first name"""
+    turkish_names = [
+        "Ahmet", "Mehmet", "Ali", "Mustafa", "Hüseyin", "Hasan", "Murat",
+        "Yusuf", "Osman", "Kemal", "Orhan", "Halil", "Cem", "Burak",
+        "Ayşe", "Fatma", "Emine", "Hatice", "Zeynep", "Elif", "Meryem",
+        "Zehra", "Sevgi", "Esra", "Derya", "Merve", "Ebru", "Gül", "Seda",
+        "Can", "Deniz", "Ege", "Kaya", "Yağız", "Toprak", "Çınar", "Yiğit", "Alp",
+        "Berk", "Doruk", "Kutay", "Tan", "Efe", "Mert", "Onur", "Tolga", "Umut"
+    ]
+    return random.choice(turkish_names)
+
+
+def generate_turkish_last_name():
+    """Generate random Turkish last name"""
+    turkish_surnames = [
+        "Yılmaz", "Kaya", "Demir", "Yıldız", "Yıldırım",
+        "Aydın", "Arslan", "Doğan", "Kılıç", "Aslan", "Erdoğan",
+        "Koç", "Kurt", "Polat", "Korkmaz", "Aktaş", "Karahan",
+        "Türk", "Kocaman", "Güler", "Yalçın", "Turan", "Güneş", "Bulut", "Tekin",
+        "Yavuz", "Aksoy", "Avcı", "Ateş", "Taş", "Alp", "Yüksel", "Demirci",
+        "Kalkan", "Toprak", "Dağ", "Deniz", "Akın", "Sarı", "Bilgin"
+    ]
+    return random.choice(turkish_surnames)
+
+
 class EmailGenerator:
     def __init__(
         self,
@@ -219,30 +245,28 @@ class EmailGenerator:
         configInstance.print_config()
         self.domain = configInstance.get_domain()
         self.default_password = password
-        self.default_first_name = self.generate_random_name()
-        self.default_last_name = self.generate_random_name()
+        
+        # Generate name and surname once during initialization
+        self.turkish_name = generate_turkish_first_name()
+        self.turkish_surname = generate_turkish_last_name()
+        
+        # Convert Turkish characters to their ASCII equivalents once
+        tr_to_en = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgioscCGIOSU")
+        self.ascii_name = self.turkish_name.lower().translate(tr_to_en)
+        self.ascii_surname = self.turkish_surname.lower().translate(tr_to_en)
 
-    def generate_random_name(self, length=6):
-        """Generate random username"""
-        first_letter = random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-        rest_letters = "".join(
-            random.choices("abcdefghijklmnopqrstuvwxyz", k=length - 1)
-        )
-        return first_letter + rest_letters
-
-    def generate_email(self, length=8):
-        """Generate random email address"""
-        random_str = "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=length))
-        timestamp = str(int(time.time()))[-6:]  # Use last 6 digits of timestamp
-        return f"{random_str}{timestamp}@{self.domain}"
+    def generate_email(self):
+        """Generate email address in format: turkish_name.turkish_surname.random_3_digits@domain"""
+        random_digits = "".join(random.choices("0123456789", k=3))
+        return f"{self.ascii_name}.{self.ascii_surname}.{random_digits}@{self.domain}"
 
     def get_account_info(self):
         """Get complete account information"""
         return {
             "email": self.generate_email(),
             "password": self.default_password,
-            "first_name": self.default_first_name,
-            "last_name": self.default_last_name,
+            "first_name": self.turkish_name,
+            "last_name": self.turkish_surname,
         }
 
 
@@ -269,8 +293,8 @@ if __name__ == "__main__":
         email_generator = EmailGenerator()
         account = email_generator.generate_email()
         password = email_generator.default_password
-        first_name = email_generator.default_first_name
-        last_name = email_generator.default_last_name
+        first_name = email_generator.turkish_name
+        last_name = email_generator.turkish_surname
 
         logging.info(f"Generated email account: {account}")
         auto_update_cursor_auth = True
