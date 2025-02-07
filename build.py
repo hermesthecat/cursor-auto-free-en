@@ -107,8 +107,6 @@ def build():
         output_dir,
         "--workpath",
         f"build/{system}",
-        " --clean",
-        "--log-level=DEBUG",
     ]
 
     loading = LoadingAnimation()
