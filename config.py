@@ -6,15 +6,15 @@ from logger import logging
 
 class Config:
     def __init__(self):
-        # Get the root directory path of the application
+        # Get application root directory path
         if getattr(sys, "frozen", False):
-            # If it's a packaged executable file
+            # If it's a packaged executable
             application_path = os.path.dirname(sys.executable)
         else:
             # If it's development environment
             application_path = os.path.dirname(os.path.abspath(__file__))
 
-        # Specify the path of .env file
+        # Specify .env file path
         dotenv_path = os.path.join(application_path, ".env")
 
         if not os.path.exists(dotenv_path):
@@ -25,6 +25,8 @@ class Config:
 
         self.imap = False
         self.temp_mail = os.getenv("TEMP_MAIL", "").strip().split("@")[0]
+        self.temp_mail_epin = os.getenv("TEMP_MAIL_EPIN", "").strip()
+        self.temp_mail_ext = os.getenv("TEMP_MAIL_EXT", "").strip()
         self.domain = os.getenv("DOMAIN", "").strip()
 
         # If temporary email is null, load IMAP
@@ -40,6 +42,12 @@ class Config:
 
     def get_temp_mail(self):
         return self.temp_mail
+
+    def get_temp_mail_epin(self):
+        return self.temp_mail_epin
+
+    def get_temp_mail_ext(self):
+        return self.temp_mail_ext
 
     def get_imap(self):
         if not self.imap:
@@ -59,8 +67,8 @@ class Config:
         """Check if configuration items are valid
 
         Check rules:
-        1. If using tempmail.plus, TEMP_MAIL and DOMAIN need to be configured
-        2. If using IMAP, IMAP_SERVER, IMAP_PORT, IMAP_USER, IMAP_PASS need to be configured
+        1. If using tempmail.plus, need to configure TEMP_MAIL and DOMAIN
+        2. If using IMAP, need to configure IMAP_SERVER, IMAP_PORT, IMAP_USER, IMAP_PASS
         3. IMAP_DIR is optional
         """
         # Basic configuration check
@@ -81,10 +89,10 @@ class Config:
         else:
             # IMAP mode
             imap_configs = {
-                "imap_server": "IMAP Server",
-                "imap_port": "IMAP Port",
-                "imap_user": "IMAP Username",
-                "imap_pass": "IMAP Password",
+                "imap_server": "IMAP server",
+                "imap_port": "IMAP port",
+                "imap_user": "IMAP username",
+                "imap_pass": "IMAP password",
             }
 
             for key, name in imap_configs.items():
@@ -94,7 +102,7 @@ class Config:
                         f"{name} not configured, please set {key.upper()} in .env file"
                     )
 
-            # IMAP_DIR is optional, check its validity if set
+            # IMAP_DIR is optional, if set check its validity
             if self.imap_dir != "null" and not self.check_is_valid(self.imap_dir):
                 raise ValueError(
                     "IMAP inbox directory configuration invalid, please set IMAP_DIR correctly in .env file"
@@ -113,13 +121,15 @@ class Config:
 
     def print_config(self):
         if self.imap:
-            logging.info(f"\033[32mIMAP Server: {self.imap_server}\033[0m")
-            logging.info(f"\033[32mIMAP Port: {self.imap_port}\033[0m")
-            logging.info(f"\033[32mIMAP Username: {self.imap_user}\033[0m")
-            logging.info(f"\033[32mIMAP Password: {'*' * len(self.imap_pass)}\033[0m")
-            logging.info(f"\033[32mIMAP Inbox Directory: {self.imap_dir}\033[0m")
+            logging.info(f"\033[32mIMAP server: {self.imap_server}\033[0m")
+            logging.info(f"\033[32mIMAP port: {self.imap_port}\033[0m")
+            logging.info(f"\033[32mIMAP username: {self.imap_user}\033[0m")
+            logging.info(f"\033[32mIMAP password: {'*' * len(self.imap_pass)}\033[0m")
+            logging.info(f"\033[32mIMAP inbox directory: {self.imap_dir}\033[0m")
         if self.temp_mail != "null":
-            logging.info(f"\033[32mTemporary Email: {self.temp_mail}@{self.domain}\033[0m")
+            logging.info(
+                f"\033[32mTemporary email: {self.temp_mail}{self.temp_mail_ext}\033[0m"
+            )
         logging.info(f"\033[32mDomain: {self.domain}\033[0m")
 
 

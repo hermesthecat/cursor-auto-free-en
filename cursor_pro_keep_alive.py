@@ -1,6 +1,13 @@
 import os
+import platform
+import json
+import sys
+from colorama import Fore, Style
+from enum import Enum
+from typing import Optional
 
 from exit_cursor import ExitCursor
+import patch_cursor_get_machine_id
 from reset_machine import MachineIDResetter
 
 os.environ["PYTHONVERBOSE"] = "0"
@@ -15,14 +22,98 @@ from browser_utils import BrowserManager
 from get_email_code import EmailVerificationHandler
 from logo import print_logo
 from config import Config
+from datetime import datetime
+
+# Define EMOJI dictionary
+EMOJI = {"ERROR": "❌", "WARNING": "⚠️", "INFO": "ℹ️"}
 
 
-def handle_turnstile(tab):
-    logging.info("Checking Turnstile verification...")
+class VerificationStatus(Enum):
+    """Verification status enumeration"""
+
+    PASSWORD_PAGE = "@name=password"
+    CAPTCHA_PAGE = "@data-index=0"
+    ACCOUNT_SETTINGS = "Account Settings"
+
+
+class TurnstileError(Exception):
+    """Turnstile verification related exception"""
+
+    pass
+
+
+def save_screenshot(tab, stage: str, timestamp: bool = True) -> None:
+    """
+    Save page screenshot
+
+    Args:
+        tab: Browser tab object
+        stage: Screenshot stage identifier
+        timestamp: Whether to add timestamp
+    """
     try:
-        while True:
+        # Create screenshots directory
+        screenshot_dir = "screenshots"
+        if not os.path.exists(screenshot_dir):
+            os.makedirs(screenshot_dir)
+
+        # Generate filename
+        if timestamp:
+            filename = f"turnstile_{stage}_{int(time.time())}.png"
+        else:
+            filename = f"turnstile_{stage}.png"
+
+        filepath = os.path.join(screenshot_dir, filename)
+
+        # Save screenshot
+        tab.get_screenshot(filepath)
+        logging.debug(f"Screenshot saved: {filepath}")
+    except Exception as e:
+        logging.warning(f"Failed to save screenshot: {str(e)}")
+
+
+def check_verification_success(tab) -> Optional[VerificationStatus]:
+    """
+    Check if verification is successful
+
+    Returns:
+        VerificationStatus: Returns corresponding status if successful, None if failed
+    """
+    for status in VerificationStatus:
+        if tab.ele(status.value):
+            logging.info(f"Verification successful - Reached {status.name} page")
+            return status
+    return None
+
+
+def handle_turnstile(tab, max_retries: int = 2, retry_interval: tuple = (1, 2)) -> bool:
+    """
+    Handle Turnstile verification
+
+    Args:
+        tab: Browser tab object
+        max_retries: Maximum number of retries
+        retry_interval: Retry interval time range (min, max)
+
+    Returns:
+        bool: Whether verification was successful
+
+    Raises:
+        TurnstileError: Exception during verification process
+    """
+    logging.info("Checking Turnstile verification...")
+    save_screenshot(tab, "start")
+
+    retry_count = 0
+
+    try:
+        while retry_count < max_retries:
+            retry_count += 1
+            logging.debug(f"Attempt {retry_count} at verification")
+
             try:
-                challengeCheck = (
+                # Locate verification frame element
+                challenge_check = (
                     tab.ele("@id=cf-turnstile", timeout=2)
                     .child()
                     .shadow_root.ele("tag:iframe")
@@ -30,30 +121,42 @@ def handle_turnstile(tab):
                     .sr("tag:input")
                 )
 
-                if challengeCheck:
-                    logging.info("Turnstile verification detected, processing...")
+                if challenge_check:
+                    logging.info("Detected Turnstile verification frame, starting process...")
+                    # Random delay before clicking verification
                     time.sleep(random.uniform(1, 3))
-                    challengeCheck.click()
+                    challenge_check.click()
                     time.sleep(2)
-                    logging.info("Turnstile verification passed")
-                    return True
-            except:
-                pass
 
-            if tab.ele("@name=password"):
-                logging.info("Verification successful - Reached password input page")
-                break
-            if tab.ele("@data-index=0"):
-                logging.info("Verification successful - Reached verification code input page")
-                break
-            if tab.ele("Account Settings"):
-                logging.info("Verification successful - Reached account settings page")
-                break
+                    # Save post-verification screenshot
+                    save_screenshot(tab, "clicked")
 
-            time.sleep(random.uniform(1, 2))
-    except Exception as e:
-        logging.error(f"Turnstile verification failed: {str(e)}")
+                    # Check verification result
+                    if check_verification_success(tab):
+                        logging.info("Turnstile verification passed")
+                        save_screenshot(tab, "success")
+                        return True
+
+            except Exception as e:
+                logging.debug(f"Current attempt unsuccessful: {str(e)}")
+
+            # Check if already verified
+            if check_verification_success(tab):
+                return True
+
+            # Random delay before next attempt
+            time.sleep(random.uniform(*retry_interval))
+
+        # Maximum retries exceeded
+        logging.error(f"Verification failed - Maximum retries {max_retries} reached")
+        save_screenshot(tab, "failed")
         return False
+
+    except Exception as e:
+        error_msg = f"Exception occurred during Turnstile verification: {str(e)}"
+        logging.error(error_msg)
+        save_screenshot(tab, "error")
+        raise TurnstileError(error_msg)
 
 
 def get_cursor_session_token(tab, max_attempts=3, retry_interval=2):
@@ -104,13 +207,13 @@ def update_cursor_auth(email=None, access_token=None, refresh_token=None):
 
 
 def sign_up_account(browser, tab):
-    logging.info("=== Starting Account Registration Process ===")
+    logging.info("=== Starting account registration process ===")
     logging.info(f"Visiting registration page: {sign_up_url}")
     tab.get(sign_up_url)
 
     try:
         if tab.ele("@name=first_name"):
-            logging.info("Filling personal information...")
+            logging.info("Filling in personal information...")
             tab.actions.click("@name=first_name").input(first_name)
             logging.info(f"First name entered: {first_name}")
             time.sleep(random.uniform(1, 3))
@@ -127,7 +230,7 @@ def sign_up_account(browser, tab):
             tab.actions.click("@type=submit")
 
     except Exception as e:
-        logging.error(f"Failed to access registration page: {str(e)}")
+        logging.error(f"Registration page access failed: {str(e)}")
         return False
 
     handle_turnstile(tab)
@@ -140,10 +243,10 @@ def sign_up_account(browser, tab):
 
             logging.info("Submitting password...")
             tab.ele("@type=submit").click()
-            logging.info("Password set, waiting for system response...")
+            logging.info("Password setup complete, waiting for system response...")
 
     except Exception as e:
-        logging.error(f"Failed to set password: {str(e)}")
+        logging.error(f"Password setup failed: {str(e)}")
         return False
 
     if tab.ele("This email is not available."):
@@ -165,16 +268,16 @@ def sign_up_account(browser, tab):
                     return False
 
                 logging.info(f"Successfully got verification code: {code}")
-                logging.info("Entering verification code...")
+                logging.info("Inputting verification code...")
                 i = 0
                 for digit in code:
                     tab.ele(f"@data-index={i}").input(digit)
                     time.sleep(random.uniform(0.1, 0.3))
                     i += 1
-                logging.info("Verification code entered")
+                logging.info("Verification code input complete")
                 break
         except Exception as e:
-            logging.error(f"Error during verification code process: {str(e)}")
+            logging.error(f"Verification code processing error: {str(e)}")
 
     handle_turnstile(tab)
     wait_time = random.randint(3, 6)
@@ -194,41 +297,15 @@ def sign_up_account(browser, tab):
         if usage_ele:
             usage_info = usage_ele.text
             total_usage = usage_info.split("/")[-1].strip()
-            logging.info(f"Account usage limit: {total_usage}")
+            logging.info(f"Account available credit limit: {total_usage}")
     except Exception as e:
-        logging.error(f"Failed to get account usage information: {str(e)}")
+        logging.error(f"Failed to get account credit limit information: {str(e)}")
 
-    logging.info("\n=== Registration Complete ===")
-    account_info = f"Cursor Account Information:\nEmail: {account}\nPassword: {password}"
+    logging.info("\n=== Registration completed ===")
+    account_info = f"Cursor account information:\nEmail: {account}\nPassword: {password}"
     logging.info(account_info)
     time.sleep(5)
     return True
-
-
-def generate_turkish_first_name():
-    """Generate random Turkish first name"""
-    turkish_names = [
-        "Ahmet", "Mehmet", "Ali", "Mustafa", "Hüseyin", "Hasan", "Murat",
-        "Yusuf", "Osman", "Kemal", "Orhan", "Halil", "Cem", "Burak",
-        "Ayşe", "Fatma", "Emine", "Hatice", "Zeynep", "Elif", "Meryem",
-        "Zehra", "Sevgi", "Esra", "Derya", "Merve", "Ebru", "Gül", "Seda",
-        "Can", "Deniz", "Ege", "Kaya", "Yağız", "Toprak", "Çınar", "Yiğit", "Alp",
-        "Berk", "Doruk", "Kutay", "Tan", "Efe", "Mert", "Onur", "Tolga", "Umut"
-    ]
-    return random.choice(turkish_names)
-
-
-def generate_turkish_last_name():
-    """Generate random Turkish last name"""
-    turkish_surnames = [
-        "Yılmaz", "Kaya", "Demir", "Yıldız", "Yıldırım",
-        "Aydın", "Arslan", "Doğan", "Kılıç", "Aslan", "Erdoğan",
-        "Koç", "Kurt", "Polat", "Korkmaz", "Aktaş", "Karahan",
-        "Türk", "Kocaman", "Güler", "Yalçın", "Turan", "Güneş", "Bulut", "Tekin",
-        "Yavuz", "Aksoy", "Avcı", "Ateş", "Taş", "Alp", "Yüksel", "Demirci",
-        "Kalkan", "Toprak", "Dağ", "Deniz", "Akın", "Sarı", "Bilgin"
-    ]
-    return random.choice(turkish_surnames)
 
 
 class EmailGenerator:
@@ -245,44 +322,113 @@ class EmailGenerator:
         configInstance.print_config()
         self.domain = configInstance.get_domain()
         self.default_password = password
-        
-        # Generate name and surname once during initialization
-        self.turkish_name = generate_turkish_first_name()
-        self.turkish_surname = generate_turkish_last_name()
-        
-        # Convert Turkish characters to their ASCII equivalents once
-        tr_to_en = str.maketrans("çğıöşüÇĞİÖŞÜ", "cgioscCGIOSU")
-        self.ascii_name = self.turkish_name.lower().translate(tr_to_en)
-        self.ascii_surname = self.turkish_surname.lower().translate(tr_to_en)
+        self.default_first_name = self.generate_random_name()
+        self.default_last_name = self.generate_random_name()
 
-    def generate_email(self):
-        random_digits = "".join(random.choices("0123456789", k=3))
-        return f"{self.ascii_name}.{self.ascii_surname}.{random_digits}@{self.domain}"
+    def generate_random_name(self, length=6):
+        """Generate random username"""
+        first_letter = random.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        rest_letters = "".join(
+            random.choices("abcdefghijklmnopqrstuvwxyz", k=length - 1)
+        )
+        return first_letter + rest_letters
+
+    def generate_email(self, length=8):
+        """Generate random email address"""
+        random_str = "".join(random.choices("abcdefghijklmnopqrstuvwxyz", k=length))
+        timestamp = str(int(time.time()))[-6:]  # Use last 6 digits of timestamp
+        return f"{random_str}{timestamp}@{self.domain}"
 
     def get_account_info(self):
         """Get complete account information"""
         return {
             "email": self.generate_email(),
             "password": self.default_password,
-            "first_name": self.turkish_name,
-            "last_name": self.turkish_surname,
+            "first_name": self.default_first_name,
+            "last_name": self.default_last_name,
         }
+
+
+def get_user_agent():
+    """Get user_agent"""
+    try:
+        # Use JavaScript to get user agent
+        browser_manager = BrowserManager()
+        browser = browser_manager.init_browser()
+        user_agent = browser.latest_tab.run_js("return navigator.userAgent")
+        browser_manager.quit()
+        return user_agent
+    except Exception as e:
+        logging.error(f"Failed to get user agent: {str(e)}")
+        return None
+
+
+def check_cursor_version():
+    """Check cursor version"""
+    pkg_path, main_path = patch_cursor_get_machine_id.get_cursor_paths()
+    with open(pkg_path, "r", encoding="utf-8") as f:
+        version = json.load(f)["version"]
+    return patch_cursor_get_machine_id.version_check(version, min_version="0.45.0")
+
+
+def reset_machine_id(greater_than_0_45):
+    if greater_than_0_45:
+        # Prompt user to manually run script https://github.com/chengazhen/cursor-auto-free/blob/main/patch_cursor_get_machine_id.py
+        patch_cursor_get_machine_id.patch_cursor_get_machine_id()
+    else:
+        MachineIDResetter().reset_machine_ids()
 
 
 if __name__ == "__main__":
     print_logo()
+    greater_than_0_45 = check_cursor_version()
     browser_manager = None
     try:
-        logging.info("\n=== Initializing Program ===")
-        ExitCursor()
-        logging.info("Initializing browser...")
-        browser_manager = BrowserManager()
-        browser = browser_manager.init_browser()
+        logging.info("\n=== Starting program ===")
+        # ExitCursor()
 
-        logging.info("Initializing email verification module...")
+        # Prompt user to choose operation mode
+        print("\nPlease choose operation mode:")
+        print("1. Reset machine code only")
+        print("2. Complete registration process")
+
+        while True:
+            try:
+                choice = int(input("Please enter option (1 or 2): ").strip())
+                if choice in [1, 2]:
+                    break
+                else:
+                    print("Invalid option, please enter again")
+            except ValueError:
+                print("Please enter a valid number")
+
+        if choice == 1:
+            # Execute reset machine code only
+            reset_machine_id(greater_than_0_45)
+            logging.info("Machine code reset completed")
+            sys.exit(0)
+
+        logging.info("Starting to initialize browser...")
+
+        # Get user_agent
+        user_agent = get_user_agent()
+        if not user_agent:
+            logging.error("Failed to get user agent, using default value")
+            user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+        # Remove "HeadlessChrome" from user_agent
+        user_agent = user_agent.replace("HeadlessChrome", "Chrome")
+
+        browser_manager = BrowserManager()
+        browser = browser_manager.init_browser(user_agent)
+
+        # Get and print browser's user-agent
+        user_agent = browser.latest_tab.run_js("return navigator.userAgent")
+
+        logging.info("Starting to initialize email verification module...")
         email_handler = EmailVerificationHandler()
 
-        logging.info("\n=== Configuration Information ===")
+        logging.info("\n=== Configuration information ===")
         login_url = "https://authenticator.cursor.sh"
         sign_up_url = "https://authenticator.cursor.sh/sign-up"
         settings_url = "https://www.cursor.com/settings"
@@ -292,16 +438,17 @@ if __name__ == "__main__":
         email_generator = EmailGenerator()
         account = email_generator.generate_email()
         password = email_generator.default_password
-        first_name = email_generator.turkish_name
-        last_name = email_generator.turkish_surname
+        first_name = email_generator.default_first_name
+        last_name = email_generator.default_last_name
 
         logging.info(f"Generated email account: {account}")
         auto_update_cursor_auth = True
 
         tab = browser.latest_tab
+
         tab.run_js("try { turnstile.reset() } catch(e) { }")
 
-        logging.info("\n=== Starting Registration Process ===")
+        logging.info("\n=== Starting registration process ===")
         logging.info(f"Visiting login page: {login_url}")
         tab.get(login_url)
 
@@ -314,11 +461,11 @@ if __name__ == "__main__":
                     email=account, access_token=token, refresh_token=token
                 )
 
-                logging.info("Resetting machine ID...")
-                MachineIDResetter().reset_machine_ids()
+                logging.info("Resetting machine code...")
+                reset_machine_id(greater_than_0_45)
                 logging.info("All operations completed")
             else:
-                logging.error("Failed to get session token, registration process incomplete")
+                logging.error("Failed to get session token, registration process not completed")
 
     except Exception as e:
         logging.error(f"Program execution error: {str(e)}")

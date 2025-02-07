@@ -11,8 +11,9 @@ class EmailVerificationHandler:
     def __init__(self):
         self.imap = Config().get_imap()
         self.username = Config().get_temp_mail()
+        self.epin = Config().get_temp_mail_epin()
         self.session = requests.Session()
-        self.emailExtension = "@mailto.plus"
+        self.emailExtension = Config().get_temp_mail_ext()
 
     def get_verification_code(self):
         code = None
@@ -21,7 +22,7 @@ class EmailVerificationHandler:
             print("Processing...")
 
             if self.imap is False:
-                # Wait and get the latest email
+                # Wait and get latest email
                 code, first_id = self._get_latest_mail_code()
                 # Clean up email
                 self._cleanup_mail(first_id)
@@ -75,7 +76,9 @@ class EmailVerificationHandler:
                     mail.store(latest_mail_id, '+FLAGS', '\\Deleted')
                     mail.expunge()
                     mail.logout()
+                    # print(f"Found verification code: {code}")
                     return code
+            # print("Verification code not found")
             mail.logout()
             return None
         except Exception as e:
@@ -106,10 +109,10 @@ class EmailVerificationHandler:
                     logging.error(f"Failed to decode email body: {e}")
         return ""
 
-    # Get verification code manually
+    # Manual verification code input
     def _get_latest_mail_code(self):
         # Get email list
-        mail_list_url = f"https://tempmail.plus/api/mails?email={self.username}{self.emailExtension}&limit=20&epin="
+        mail_list_url = f"https://tempmail.plus/api/mails?email={self.username}{self.emailExtension}&limit=20&epin={self.epin}"
         mail_list_response = self.session.get(mail_list_url)
         mail_list_data = mail_list_response.json()
         time.sleep(0.5)
@@ -122,7 +125,7 @@ class EmailVerificationHandler:
             return None, None
 
         # Get specific email content
-        mail_detail_url = f"https://tempmail.plus/api/mails/{first_id}?email={self.username}{self.emailExtension}&epin="
+        mail_detail_url = f"https://tempmail.plus/api/mails/{first_id}?email={self.username}{self.emailExtension}&epin={self.epin}"
         mail_detail_response = self.session.get(mail_detail_url)
         mail_detail_data = mail_detail_response.json()
         time.sleep(0.5)
@@ -139,12 +142,12 @@ class EmailVerificationHandler:
         return None, None
 
     def _cleanup_mail(self, first_id):
-        # Construct URL and data for delete request
+        # Construct delete request URL and data
         delete_url = "https://tempmail.plus/api/mails/"
         payload = {
             "email": f"{self.username}{self.emailExtension}",
             "first_id": first_id,
-            "epin": "",
+            "epin": f"{self.epin}",
         }
 
         # Try up to 5 times
@@ -157,7 +160,7 @@ class EmailVerificationHandler:
             except:
                 pass
 
-            # If failed, wait 0.5 seconds before retrying
+            # If failed, wait 0.5 seconds and retry
             time.sleep(0.5)
 
         return False

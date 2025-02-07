@@ -22,11 +22,11 @@ EMOJI = {
 
 class MachineIDResetter:
     def __init__(self):
-        # Check operating system
+        # Determine operating system
         if sys.platform == "win32":  # Windows
             appdata = os.getenv("APPDATA")
             if appdata is None:
-                raise EnvironmentError("APPDATA environment variable not set")
+                raise EnvironmentError("APPDATA environment variable is not set")
             self.db_path = os.path.join(
                 appdata, "Cursor", "User", "globalStorage", "storage.json"
             )
@@ -82,7 +82,7 @@ class MachineIDResetter:
                     f"{Fore.RED}{EMOJI['ERROR']} Cannot read/write configuration file, please check file permissions!{Style.RESET_ALL}"
                 )
                 print(
-                    f"{Fore.RED}{EMOJI['ERROR']} If you have used go-cursor-help to modify IDs, please modify the read-only permission of {self.db_path} {Style.RESET_ALL}"
+                    f"{Fore.RED}{EMOJI['ERROR']} If you've used go-cursor-help to modify IDs, please modify the read-only permission for {self.db_path} {Style.RESET_ALL}"
                 )
                 return False
 
@@ -117,8 +117,7 @@ class MachineIDResetter:
             )
             return False
         except Exception as e:
-            print(f"{Fore.RED}{EMOJI['ERROR']} Error during reset process: {str(e)}{Style.RESET_ALL}")
-
+            print(f"{Fore.RED}{EMOJI['ERROR']} Error during reset: {str(e)}{Style.RESET_ALL}")
             return False
 
 

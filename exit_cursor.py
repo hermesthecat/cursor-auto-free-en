@@ -7,7 +7,7 @@ def ExitCursor(timeout=5):
     Gracefully close Cursor processes
     
     Args:
-        timeout (int): Timeout period (in seconds) to wait for natural process termination
+        timeout (int): Timeout in seconds to wait for processes to terminate naturally
     Returns:
         bool: Whether all processes were successfully closed
     """
@@ -34,7 +34,7 @@ def ExitCursor(timeout=5):
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
 
-        # Wait for natural process termination
+        # Wait for processes to terminate naturally
         start_time = time.time()
         while time.time() - start_time < timeout:
             still_running = []
@@ -55,7 +55,7 @@ def ExitCursor(timeout=5):
         # If processes are still running after timeout
         if still_running:
             process_list = ", ".join([str(p.pid) for p in still_running])
-            logging.warning(f"The following processes could not be closed within the time limit: {process_list}")
+            logging.warning(f"The following processes did not close within the time limit: {process_list}")
             return False
             
         return True

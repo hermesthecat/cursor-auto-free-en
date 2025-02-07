@@ -4,14 +4,14 @@ import sys
 
 
 class CursorAuthManager:
-    """Cursor Authentication Manager"""
+    """Cursor authentication information manager"""
 
     def __init__(self):
-        # Check operating system
+        # Determine operating system
         if sys.platform == "win32":  # Windows
             appdata = os.getenv("APPDATA")
             if appdata is None:
-                raise EnvironmentError("APPDATA environment variable not set")
+                raise EnvironmentError("APPDATA environment variable is not set")
             self.db_path = os.path.join(
                 appdata, "Cursor", "User", "globalStorage", "state.vscdb"
             )
@@ -56,7 +56,7 @@ class CursorAuthManager:
 
             for key, value in updates:
 
-                # If no rows were updated, it means the key doesn't exist, perform insert
+                # If no rows were updated, key doesn't exist, perform insert
                 # Check if accessToken exists
                 check_query = f"SELECT COUNT(*) FROM itemTable WHERE key = ?"
                 cursor.execute(check_query, (key,))
