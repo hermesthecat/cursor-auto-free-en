@@ -12,19 +12,19 @@ class BrowserManager:
         self.browser = None
 
     def init_browser(self, user_agent=None):
-        """初始化浏览器"""
+        """Initialize browser"""
         co = self._get_browser_options(user_agent)
         self.browser = Chromium(co)
         return self.browser
 
     def _get_browser_options(self, user_agent=None):
-        """获取浏览器配置"""
+        """Get browser configuration"""
         co = ChromiumOptions()
         try:
             extension_path = self._get_extension_path("turnstilePatch")
             co.add_extension(extension_path)
         except FileNotFoundError as e:
-            logging.warning(f"警告: {e}")
+            logging.warning(f"Warning: {e}")
 
         browser_path = os.getenv("BROWSER_PATH")
         if browser_path:
@@ -42,17 +42,17 @@ class BrowserManager:
 
         co.headless(
             os.getenv("BROWSER_HEADLESS", "True").lower() == "true"
-        )  # 生产环境使用无头模式
+        )  # Use headless mode in production environment
 
-        # Mac 系统特殊处理
+        # Special handling for Mac systems
         if sys.platform == "darwin":
             co.set_argument("--no-sandbox")
             co.set_argument("--disable-gpu")
 
         return co
 
-    def _get_extension_path(self,exname='turnstilePatch'):
-        """获取插件路径"""
+    def _get_extension_path(self, exname='turnstilePatch'):
+        """Get extension path"""
         root_dir = os.getcwd()
         extension_path = os.path.join(root_dir, exname)
 
@@ -60,12 +60,12 @@ class BrowserManager:
             extension_path = os.path.join(sys._MEIPASS, exname)
 
         if not os.path.exists(extension_path):
-            raise FileNotFoundError(f"插件不存在: {extension_path}")
+            raise FileNotFoundError(f"Extension does not exist: {extension_path}")
 
         return extension_path
 
     def quit(self):
-        """关闭浏览器"""
+        """Close browser"""
         if self.browser:
             try:
                 self.browser.quit()

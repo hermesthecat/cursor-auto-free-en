@@ -7,19 +7,19 @@ import os
 
 
 def get_extension_path():
-    """获取插件路径"""
+    """Get extension path"""
     root_dir = os.getcwd()
     extension_path = os.path.join(root_dir, "turnstilePatch")
 
     if hasattr(sys, "_MEIPASS"):
-        print("运行在打包环境中")
+        print("Running in packaged environment")
         extension_path = os.path.join(sys._MEIPASS, "turnstilePatch")
 
-    print(f"尝试加载插件路径: {extension_path}")
+    print(f"Attempting to load extension path: {extension_path}")
 
     if not os.path.exists(extension_path):
         raise FileNotFoundError(
-            f"插件不存在: {extension_path}\n请确保 turnstilePatch 文件夹在正确位置"
+            f"Extension does not exist: {extension_path}\nPlease ensure the turnstilePatch folder is in the correct location"
         )
 
     return extension_path
@@ -31,7 +31,7 @@ def get_browser_options():
         extension_path = get_extension_path()
         co.add_extension(extension_path)
     except FileNotFoundError as e:
-        print(f"警告: {e}")
+        print(f"Warning: {e}")
 
     co.set_user_agent(
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.6723.92 Safari/537.36"
@@ -40,7 +40,7 @@ def get_browser_options():
     co.set_argument("--hide-crash-restore-bubble")
     co.auto_port()
 
-    # Mac 系统特殊处理
+    # Special handling for Mac systems
     if sys.platform == "darwin":
         co.set_argument("--no-sandbox")
         co.set_argument("--disable-gpu")
@@ -49,40 +49,40 @@ def get_browser_options():
 
 
 def get_veri_code(username):
-    # 使用相同的浏览器配置
+    # Use the same browser configuration
     co = get_browser_options()
     browser = Chromium(co)
     code = None
 
     try:
-        # 获取当前标签页
+        # Get current tab
         tab = browser.latest_tab
         tab.run_js("try { turnstile.reset() } catch(e) { }")
 
-        # 打开临时邮箱网站
+        # Open temporary email website
         tab.get("https://tempmail.plus/zh")
         time.sleep(2)
 
-        # 设置邮箱用户名
+        # Set email username
         while True:
             if tab.ele("@id=pre_button"):
-                # 点击输入框
+                # Click input field
                 tab.actions.click("@id=pre_button")
                 time.sleep(1)
-                # 删除之前的内容
+                # Delete previous content
                 tab.run_js('document.getElementById("pre_button").value = ""')
 
-                # 输入新用户名并回车
+                # Input new username and press Enter
                 tab.actions.input(username).key_down(Keys.ENTER).key_up(Keys.ENTER)
                 break
             time.sleep(1)
 
-        # 等待并获取新邮件
+        # Wait and get new email
         while True:
             new_mail = tab.ele("@class=mail")
             if new_mail:
                 if new_mail.text:
-                    print("最新的邮件：", new_mail.text)
+                    print("Latest email:", new_mail.text)
                     tab.actions.click("@class=mail")
                     break
                 else:
@@ -90,7 +90,7 @@ def get_veri_code(username):
                     break
             time.sleep(1)
 
-        # 提取验证码
+        # Extract verification code
         if tab.ele("@class=overflow-auto mb-20"):
             email_content = tab.ele("@class=overflow-auto mb-20").text
             verification_code = re.search(
@@ -98,29 +98,29 @@ def get_veri_code(username):
             )
             if verification_code:
                 code = verification_code.group(1)
-                print("验证码：", code)
+                print("Verification code:", code)
             else:
-                print("未找到验证码")
+                print("Verification code not found")
 
-        # 删除邮件
+        # Delete email
         if tab.ele("@id=delete_mail"):
             tab.actions.click("@id=delete_mail")
             time.sleep(1)
 
         if tab.ele("@id=confirm_mail"):
             tab.actions.click("@id=confirm_mail")
-            print("删除邮件")
+            print("Email deleted")
 
     except Exception as e:
-        print(f"发生错误: {str(e)}")
+        print(f"An error occurred: {str(e)}")
     finally:
         browser.quit()
 
     return code
 
 
-# 测试运行
+# Test run
 if __name__ == "__main__":
-    test_username = "test_user"  # 替换为你要测试的用户名
+    test_username = "test_user"  # Replace with the username you want to test
     code = get_veri_code(test_username)
-    print(f"获取到的验证码: {code}")
+    print(f"Retrieved verification code: {code}")

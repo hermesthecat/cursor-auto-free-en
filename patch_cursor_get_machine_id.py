@@ -12,9 +12,9 @@ import tempfile
 from typing import Tuple
 
 
-# 配置日志
+# Configure logging
 def setup_logging() -> logging.Logger:
-    """配置并返回logger实例"""
+    """Configure and return logger instance"""
     logger = logging.getLogger(__name__)
     logger.setLevel(logging.INFO)
     handler = logging.StreamHandler()
@@ -31,13 +31,13 @@ logger = setup_logging()
 
 def get_cursor_paths() -> Tuple[str, str]:
     """
-    根据不同操作系统获取 Cursor 相关路径
+    Get Cursor related paths based on different operating systems
 
     Returns:
-        Tuple[str, str]: (package.json路径, main.js路径)的元组
+        Tuple[str, str]: Tuple of (package.json path, main.js path)
 
     Raises:
-        OSError: 当找不到有效路径或系统不支持时抛出
+        OSError: When a valid path cannot be found or the system is not supported
     """
     system = platform.system()
 
@@ -62,24 +62,24 @@ def get_cursor_paths() -> Tuple[str, str]:
     }
 
     if system not in paths_map:
-        raise OSError(f"不支持的操作系统: {system}")
+        raise OSError(f"Unsupported operating system: {system}")
 
     if system == "Linux":
         for base in paths_map["Linux"]["bases"]:
             pkg_path = os.path.join(base, paths_map["Linux"]["package"])
             if os.path.exists(pkg_path):
                 return (pkg_path, os.path.join(base, paths_map["Linux"]["main"]))
-        raise OSError("在 Linux 系统上未找到 Cursor 安装路径")
+        raise OSError("Cursor installation path not found on Linux system")
 
     base_path = paths_map[system]["base"]
-    # 判断Windows是否存在这个文件夹,如果不存在,提示需要创建软连接后重试
-    if system  == "Windows":
+    # Check if the folder exists on Windows, if not, prompt to create a symbolic link and try again
+    if system == "Windows":
         if not os.path.exists(base_path):
-            logging.info('可能您的Cursor不是默认安装路径,请创建软连接,命令如下:')
-            logging.info('cmd /c mklink /d "C:\\Users\\<username>\\AppData\\Local\\Programs\\Cursor" "默认安装路径"')
-            logging.info('例如:')
+            logging.info('Your Cursor may not be installed in the default path, please create a symbolic link using the following command:')
+            logging.info('cmd /c mklink /d "C:\\Users\\<username>\\AppData\\Local\\Programs\\Cursor" "default installation path"')
+            logging.info('For example:')
             logging.info('cmd /c mklink /d "C:\\Users\\<username>\\AppData\\Local\\Programs\\Cursor" "D:\\SoftWare\\cursor"')
-            input("\n程序执行完毕，按回车键退出...")
+            input("\nScript execution completed, press Enter to exit...")
     return (
         os.path.join(base_path, paths_map[system]["package"]),
         os.path.join(base_path, paths_map[system]["main"]),
@@ -88,22 +88,22 @@ def get_cursor_paths() -> Tuple[str, str]:
 
 def check_system_requirements(pkg_path: str, main_path: str) -> bool:
     """
-    检查系统要求
+    Check system requirements
 
     Args:
-        pkg_path: package.json 文件路径
-        main_path: main.js 文件路径
+        pkg_path: package.json file path
+        main_path: main.js file path
 
     Returns:
-        bool: 检查是否通过
+        bool: Whether the check passed
     """
     for file_path in [pkg_path, main_path]:
         if not os.path.isfile(file_path):
-            logger.error(f"文件不存在: {file_path}")
+            logger.error(f"File does not exist: {file_path}")
             return False
 
         if not os.access(file_path, os.W_OK):
-            logger.error(f"没有文件写入权限: {file_path}")
+            logger.error(f"No write permission for file: {file_path}")
             return False
 
     return True
@@ -111,20 +111,20 @@ def check_system_requirements(pkg_path: str, main_path: str) -> bool:
 
 def version_check(version: str, min_version: str = "", max_version: str = "") -> bool:
     """
-    版本号检查
+    Version number check
 
     Args:
-        version: 当前版本号
-        min_version: 最小版本号要求
-        max_version: 最大版本号要求
+        version: Current version number
+        min_version: Minimum version requirement
+        max_version: Maximum version requirement
 
     Returns:
-        bool: 版本号是否符合要求
+        bool: Whether the version meets the requirements
     """
     version_pattern = r"^\d+\.\d+\.\d+$"
     try:
         if not re.match(version_pattern, version):
-            logger.error(f"无效的版本号格式: {version}")
+            logger.error(f"Invalid version format: {version}")
             return False
 
         def parse_version(ver: str) -> Tuple[int, ...]:
@@ -133,32 +133,32 @@ def version_check(version: str, min_version: str = "", max_version: str = "") ->
         current = parse_version(version)
 
         if min_version and current < parse_version(min_version):
-            logger.error(f"版本号 {version} 小于最小要求 {min_version}")
+            logger.error(f"Version {version} is less than minimum requirement {min_version}")
             return False
 
         if max_version and current > parse_version(max_version):
-            logger.error(f"版本号 {version} 大于最大要求 {max_version}")
+            logger.error(f"Version {version} is greater than maximum requirement {max_version}")
             return False
 
         return True
 
     except Exception as e:
-        logger.error(f"版本检查失败: {str(e)}")
+        logger.error(f"Version check failed: {str(e)}")
         return False
 
 
 def modify_main_js(main_path: str) -> bool:
     """
-    修改 main.js 文件
+    Modify main.js file
 
     Args:
-        main_path: main.js 文件路径
+        main_path: main.js file path
 
     Returns:
-        bool: 修改是否成功
+        bool: Whether the modification was successful
     """
     try:
-        # 获取原始文件的权限和所有者信息
+        # Get original file permissions and owner information
         original_stat = os.stat(main_path)
         original_mode = original_stat.st_mode
         original_uid = original_stat.st_uid
@@ -168,7 +168,7 @@ def modify_main_js(main_path: str) -> bool:
             with open(main_path, "r", encoding="utf-8") as main_file:
                 content = main_file.read()
 
-            # 执行替换
+            # Perform replacements
             patterns = {
                 r"async getMachineId\(\)\{return [^??]+\?\?([^}]+)\}": r"async getMachineId(){return \1}",
                 r"async getMacMachineId\(\)\{return [^??]+\?\?([^}]+)\}": r"async getMacMachineId(){return \1}",
@@ -180,20 +180,20 @@ def modify_main_js(main_path: str) -> bool:
             tmp_file.write(content)
             tmp_path = tmp_file.name
 
-        # 使用 shutil.copy2 保留文件权限
+        # Use shutil.copy2 to preserve file permissions
         shutil.copy2(main_path, main_path + ".old")
         shutil.move(tmp_path, main_path)
 
-        # 恢复原始文件的权限和所有者
+        # Restore original file permissions and owner
         os.chmod(main_path, original_mode)
-        if os.name != "nt":  # 在非Windows系统上设置所有者
+        if os.name != "nt":  # Set owner on non-Windows systems
             os.chown(main_path, original_uid, original_gid)
 
-        logger.info("文件修改成功")
+        logger.info("File modification successful")
         return True
 
     except Exception as e:
-        logger.error(f"修改文件时发生错误: {str(e)}")
+        logger.error(f"Error occurred during file modification: {str(e)}")
         if "tmp_path" in locals():
             os.unlink(tmp_path)
         return False
@@ -201,108 +201,108 @@ def modify_main_js(main_path: str) -> bool:
 
 def backup_files(pkg_path: str, main_path: str) -> bool:
     """
-    备份原始文件
+    Backup original files
 
     Args:
-        pkg_path: package.json 文件路径（未使用）
-        main_path: main.js 文件路径
+        pkg_path: package.json file path (unused)
+        main_path: main.js file path
 
     Returns:
-        bool: 备份是否成功
+        bool: Whether the backup was successful
     """
     try:
-        # 只备份 main.js
+        # Only back up main.js
         if os.path.exists(main_path):
             backup_main = f"{main_path}.bak"
             shutil.copy2(main_path, backup_main)
-            logger.info(f"已备份 main.js: {backup_main}")
+            logger.info(f"main.js backed up: {backup_main}")
 
         return True
     except Exception as e:
-        logger.error(f"备份文件失败: {str(e)}")
+        logger.error(f"File backup failed: {str(e)}")
         return False
 
 
 def restore_backup_files(pkg_path: str, main_path: str) -> bool:
     """
-    恢复备份文件
+    Restore backup files
 
     Args:
-        pkg_path: package.json 文件路径（未使用）
-        main_path: main.js 文件路径
+        pkg_path: package.json file path (unused)
+        main_path: main.js file path
 
     Returns:
-        bool: 恢复是否成功
+        bool: Whether the restoration was successful
     """
     try:
-        # 只恢复 main.js
+        # Only restore main.js
         backup_main = f"{main_path}.bak"
         if os.path.exists(backup_main):
             shutil.copy2(backup_main, main_path)
-            logger.info(f"已恢复 main.js")
+            logger.info(f"main.js restored")
             return True
 
-        logger.error("未找到备份文件")
+        logger.error("Backup file not found")
         return False
     except Exception as e:
-        logger.error(f"恢复备份失败: {str(e)}")
+        logger.error(f"Backup restoration failed: {str(e)}")
         return False
 
 
 def patch_cursor_get_machine_id(restore_mode=False) -> None:
     """
-    主函数
+    Main function
 
     Args:
-        restore_mode: 是否为恢复模式
+        restore_mode: Whether in restore mode
     """
-    logger.info("开始执行脚本...")
+    logger.info("Starting script execution...")
 
     try:
-        # 获取路径
+        # Get paths
         pkg_path, main_path = get_cursor_paths()
 
-        # 检查系统要求
+        # Check system requirements
         if not check_system_requirements(pkg_path, main_path):
             sys.exit(1)
 
         if restore_mode:
-            # 恢复备份
+            # Restore backup
             if restore_backup_files(pkg_path, main_path):
-                logger.info("备份恢复完成")
+                logger.info("Backup restoration completed")
             else:
-                logger.error("备份恢复失败")
+                logger.error("Backup restoration failed")
             return
 
-        # 获取版本号
+        # Get version number
         try:
             with open(pkg_path, "r", encoding="utf-8") as f:
                 version = json.load(f)["version"]
-            logger.info(f"当前 Cursor 版本: {version}")
+            logger.info(f"Current Cursor version: {version}")
         except Exception as e:
-            logger.error(f"无法读取版本号: {str(e)}")
+            logger.error(f"Cannot read version number: {str(e)}")
             sys.exit(1)
 
-        # 检查版本
+        # Check version
         if not version_check(version, min_version="0.45.0"):
-            logger.error("版本不符合要求（需 >= 0.45.x）")
+            logger.error("Version does not meet requirements (need >= 0.45.x)")
             sys.exit(1)
 
-        logger.info("版本检查通过，准备修改文件")
+        logger.info("Version check passed, preparing to modify files")
 
-        # 备份文件
+        # Backup files
         if not backup_files(pkg_path, main_path):
-            logger.error("文件备份失败，终止操作")
+            logger.error("File backup failed, operation aborted")
             sys.exit(1)
 
-        # 修改文件
+        # Modify files
         if not modify_main_js(main_path):
             sys.exit(1)
 
-        logger.info("脚本执行完成")
+        logger.info("Script execution completed")
 
     except Exception as e:
-        logger.error(f"执行过程中发生错误: {str(e)}")
+        logger.error(f"Error occurred during execution: {str(e)}")
         sys.exit(1)
 
 

@@ -4,17 +4,17 @@ import time
 
 def ExitCursor(timeout=5):
     """
-    温和地关闭 Cursor 进程
+    Gracefully shut down Cursor processes
     
     Args:
-        timeout (int): 等待进程自然终止的超时时间（秒）
+        timeout (int): Timeout in seconds to wait for processes to terminate naturally
     Returns:
-        bool: 是否成功关闭所有进程
+        bool: Whether all processes were successfully closed
     """
     try:
-        logging.info("开始退出Cursor...")
+        logging.info("Starting to exit Cursor...")
         cursor_processes = []
-        # 收集所有 Cursor 进程
+        # Collect all Cursor processes
         for proc in psutil.process_iter(['pid', 'name']):
             try:
                 if proc.info['name'].lower() in ['cursor.exe', 'cursor']:
@@ -23,18 +23,18 @@ def ExitCursor(timeout=5):
                 continue
 
         if not cursor_processes:
-            logging.info("未发现运行中的 Cursor 进程")
+            logging.info("No running Cursor processes found")
             return True
 
-        # 温和地请求进程终止
+        # Gracefully request process termination
         for proc in cursor_processes:
             try:
                 if proc.is_running():
-                    proc.terminate()  # 发送终止信号
+                    proc.terminate()  # Send termination signal
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
 
-        # 等待进程自然终止
+        # Wait for processes to terminate naturally
         start_time = time.time()
         while time.time() - start_time < timeout:
             still_running = []
@@ -46,22 +46,22 @@ def ExitCursor(timeout=5):
                     continue
             
             if not still_running:
-                logging.info("所有 Cursor 进程已正常关闭")
+                logging.info("All Cursor processes have been properly closed")
                 return True
                 
-            # 等待一小段时间再检查
+            # Wait a short time before checking again
             time.sleep(0.5)
             
-        # 如果超时后仍有进程在运行
+        # If processes are still running after timeout
         if still_running:
             process_list = ", ".join([str(p.pid) for p in still_running])
-            logging.warning(f"以下进程未能在规定时间内关闭: {process_list}")
+            logging.warning(f"The following processes could not be closed within the specified time: {process_list}")
             return False
             
         return True
 
     except Exception as e:
-        logging.error(f"关闭 Cursor 进程时发生错误: {str(e)}")
+        logging.error(f"Error occurred while closing Cursor processes: {str(e)}")
         return False
 
 if __name__ == "__main__":
