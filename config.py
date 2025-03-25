@@ -2,25 +2,26 @@ from dotenv import load_dotenv
 import os
 import sys
 from logger import logging
+from language import get_translation
 
 
 class Config:
     def __init__(self):
-        # Get application root directory path
+        # 获取应用程序的根目录路径
         if getattr(sys, "frozen", False):
-            # If it's a packaged executable
+            # 如果是打包后的可执行文件
             application_path = os.path.dirname(sys.executable)
         else:
-            # If it's development environment
+            # 如果是开发环境
             application_path = os.path.dirname(os.path.abspath(__file__))
 
-        # Specify .env file path
+        # 指定 .env 文件的路径
         dotenv_path = os.path.join(application_path, ".env")
 
         if not os.path.exists(dotenv_path):
-            raise FileNotFoundError(f"File {dotenv_path} does not exist")
+            raise FileNotFoundError(get_translation("file_not_exists", path=dotenv_path))
 
-        # Load .env file
+        # 加载 .env 文件
         load_dotenv(dotenv_path)
 
         self.imap = False
@@ -29,7 +30,7 @@ class Config:
         self.temp_mail_ext = os.getenv("TEMP_MAIL_EXT", "").strip()
         self.domain = os.getenv("DOMAIN", "").strip()
 
-        # If temporary email is null, load IMAP
+        # 如果临时邮箱为null则加载IMAP
         if self.temp_mail == "null":
             self.imap = True
             self.imap_server = os.getenv("IMAP_SERVER", "").strip()
@@ -41,12 +42,15 @@ class Config:
         self.check_config()
 
     def get_temp_mail(self):
+
         return self.temp_mail
 
     def get_temp_mail_epin(self):
+
         return self.temp_mail_epin
 
     def get_temp_mail_ext(self):
+
         return self.temp_mail_ext
 
     def get_imap(self):
@@ -63,81 +67,83 @@ class Config:
     def get_domain(self):
         return self.domain
 
-    def check_config(self):
-        """Check if configuration items are valid
-
-        Check rules:
-        1. If using tempmail.plus, need to configure TEMP_MAIL and DOMAIN
-        2. If using IMAP, need to configure IMAP_SERVER, IMAP_PORT, IMAP_USER, IMAP_PASS
-        3. IMAP_DIR is optional
+    def get_protocol(self):
+        """获取邮件协议类型
+        
+        Returns:
+            str: 'IMAP' 或 'POP3'
         """
-        # Basic configuration check
+        return os.getenv('IMAP_PROTOCOL', 'POP3')
+
+    def check_config(self):
+        """检查配置项是否有效
+
+        检查规则：
+        1. 如果使用 tempmail.plus，需要配置 TEMP_MAIL 和 DOMAIN
+        2. 如果使用 IMAP，需要配置 IMAP_SERVER、IMAP_PORT、IMAP_USER、IMAP_PASS
+        3. IMAP_DIR 是可选的
+        """
+        # 基础配置检查
         required_configs = {
-            "domain": "Domain",
+            "domain": "domain_not_configured",
         }
 
-        # Check basic configuration
-        for key, name in required_configs.items():
+        # 检查基础配置
+        for key, error_key in required_configs.items():
             if not self.check_is_valid(getattr(self, key)):
-                raise ValueError(f"{name} not configured, please set {key.upper()} in .env file")
+                raise ValueError(get_translation(error_key))
 
-        # Check email configuration
+        # 检查邮箱配置
         if self.temp_mail != "null":
-            # tempmail.plus mode
+            # tempmail.plus 模式
             if not self.check_is_valid(self.temp_mail):
-                raise ValueError("Temporary email not configured, please set TEMP_MAIL in .env file")
+                raise ValueError(get_translation("temp_mail_not_configured"))
         else:
-            # IMAP mode
+            # IMAP 模式
             imap_configs = {
-                "imap_server": "IMAP server",
-                "imap_port": "IMAP port",
-                "imap_user": "IMAP username",
-                "imap_pass": "IMAP password",
+                "imap_server": "imap_server_not_configured",
+                "imap_port": "imap_port_not_configured",
+                "imap_user": "imap_user_not_configured",
+                "imap_pass": "imap_pass_not_configured",
             }
 
-            for key, name in imap_configs.items():
+            for key, error_key in imap_configs.items():
                 value = getattr(self, key)
                 if value == "null" or not self.check_is_valid(value):
-                    raise ValueError(
-                        f"{name} not configured, please set {key.upper()} in .env file"
-                    )
+                    raise ValueError(get_translation(error_key))
 
-            # IMAP_DIR is optional, if set check its validity
+            # IMAP_DIR 是可选的，如果设置了就检查其有效性
             if self.imap_dir != "null" and not self.check_is_valid(self.imap_dir):
-                raise ValueError(
-                    "IMAP inbox directory configuration invalid, please set IMAP_DIR correctly in .env file"
-                )
+                raise ValueError(get_translation("imap_dir_invalid"))
 
     def check_is_valid(self, value):
-        """Check if configuration item is valid
+        """检查配置项是否有效
 
         Args:
-            value: Value of configuration item
+            value: 配置项的值
 
         Returns:
-            bool: Whether configuration item is valid
+            bool: 配置项是否有效
         """
         return isinstance(value, str) and len(str(value).strip()) > 0
 
     def print_config(self):
         if self.imap:
-            logging.info(f"\033[32mIMAP server: {self.imap_server}\033[0m")
-            logging.info(f"\033[32mIMAP port: {self.imap_port}\033[0m")
-            logging.info(f"\033[32mIMAP username: {self.imap_user}\033[0m")
-            logging.info(f"\033[32mIMAP password: {'*' * len(self.imap_pass)}\033[0m")
-            logging.info(f"\033[32mIMAP inbox directory: {self.imap_dir}\033[0m")
+            logging.info(get_translation("imap_server", server=self.imap_server))
+            logging.info(get_translation("imap_port", port=self.imap_port))
+            logging.info(get_translation("imap_username", username=self.imap_user))
+            logging.info(get_translation("imap_password", password='*' * len(self.imap_pass)))
+            logging.info(get_translation("imap_inbox_dir", dir=self.imap_dir))
         if self.temp_mail != "null":
-            logging.info(
-                f"\033[32mTemporary email: {self.temp_mail}{self.temp_mail_ext}\033[0m"
-            )
-        logging.info(f"\033[32mDomain: {self.domain}\033[0m")
+            logging.info(get_translation("temp_mail", mail=f"{self.temp_mail}{self.temp_mail_ext}"))
+        logging.info(get_translation("domain", domain=self.domain))
 
 
-# Usage example
+# 使用示例
 if __name__ == "__main__":
     try:
         config = Config()
-        print("Environment variables loaded successfully!")
+        print(get_translation("env_variables_loaded"))
         config.print_config()
     except ValueError as e:
-        print(f"Error: {e}")
+        print(get_translation("error_prefix", error=e))

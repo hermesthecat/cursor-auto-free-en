@@ -4,14 +4,14 @@ import sys
 
 
 class CursorAuthManager:
-    """Cursor authentication information manager"""
+    """Cursor认证信息管理器"""
 
     def __init__(self):
-        # Determine operating system
+        # 判断操作系统
         if sys.platform == "win32":  # Windows
             appdata = os.getenv("APPDATA")
             if appdata is None:
-                raise EnvironmentError("APPDATA environment variable is not set")
+                raise EnvironmentError("APPDATA 环境变量未设置")
             self.db_path = os.path.join(
                 appdata, "Cursor", "User", "globalStorage", "state.vscdb"
             )
@@ -19,23 +19,23 @@ class CursorAuthManager:
             self.db_path = os.path.abspath(os.path.expanduser(
                 "~/Library/Application Support/Cursor/User/globalStorage/state.vscdb"
             ))
-        elif sys.platform == "linux" : # Linux and other Unix-like systems
+        elif sys.platform == "linux" : # Linux 和其他类Unix系统
             self.db_path = os.path.abspath(os.path.expanduser(
                 "~/.config/Cursor/User/globalStorage/state.vscdb"
             ))
         else:
-            raise NotImplementedError(f"Unsupported operating system: {sys.platform}")
+            raise NotImplementedError(f"不支持的操作系统: {sys.platform}")
 
     def update_auth(self, email=None, access_token=None, refresh_token=None):
         """
-        Update Cursor authentication information
-        :param email: New email address
-        :param access_token: New access token
-        :param refresh_token: New refresh token
-        :return: bool Whether update was successful
+        更新Cursor的认证信息
+        :param email: 新的邮箱地址
+        :param access_token: 新的访问令牌
+        :param refresh_token: 新的刷新令牌
+        :return: bool 是否成功更新
         """
         updates = []
-        # Login status
+        # 登录状态
         updates.append(("cursorAuth/cachedSignUpType", "Auth_0"))
 
         if email is not None:
@@ -46,7 +46,7 @@ class CursorAuthManager:
             updates.append(("cursorAuth/refreshToken", refresh_token))
 
         if not updates:
-            print("No values provided for update")
+            print("没有提供任何要更新的值")
             return False
 
         conn = None
@@ -56,8 +56,8 @@ class CursorAuthManager:
 
             for key, value in updates:
 
-                # If no rows were updated, key doesn't exist, perform insert
-                # Check if accessToken exists
+                # 如果没有更新任何行,说明key不存在,执行插入
+                # 检查 accessToken 是否存在
                 check_query = f"SELECT COUNT(*) FROM itemTable WHERE key = ?"
                 cursor.execute(check_query, (key,))
                 if cursor.fetchone()[0] == 0:
@@ -68,18 +68,18 @@ class CursorAuthManager:
                     cursor.execute(update_query, (value, key))
 
                 if cursor.rowcount > 0:
-                    print(f"Successfully updated {key.split('/')[-1]}")
+                    print(f"成功更新 {key.split('/')[-1]}")
                 else:
-                    print(f"{key.split('/')[-1]} not found or value unchanged")
+                    print(f"未找到 {key.split('/')[-1]} 或值未变化")
 
             conn.commit()
             return True
 
         except sqlite3.Error as e:
-            print("Database error:", str(e))
+            print("数据库错误:", str(e))
             return False
         except Exception as e:
-            print("An error occurred:", str(e))
+            print("发生错误:", str(e))
             return False
         finally:
             if conn:
